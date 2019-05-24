@@ -22,7 +22,10 @@ module Frameit
         color = Frameit::Color::ROSE_GOLD if Frameit.config[:rose_gold]
       end
 
-      screenshots = Dir.glob("#{path}/**/*.{png,PNG}").uniq # uniq because thanks to {png,PNG} there are duplicates
+      screenshots = Dir.glob("#{path}/**/*.{png,PNG}").uniq.sort # uniq because thanks to {png,PNG} there are duplicates
+
+      scale_factors = Hash.new
+      scale_factors.default = 1.0
 
       if screenshots.count > 0
         screenshots.each do |full_path|
@@ -40,13 +43,14 @@ module Frameit
             if screenshot.mac?
               editor = MacEditor.new(screenshot)
             else
-              editor = Editor.new(screenshot, Frameit.config[:debug_mode])
+              editor = Editor.new(screenshot, Frameit.config[:debug_mode], scale_factors[screenshot.screen_size])
             end
             if editor.should_skip?
               UI.message("Skipping framing of screenshot #{screenshot.path}.  No title provided in your Framefile.json or title.strings.")
             else
               Helper.show_loading_indicator("Framing screenshot '#{full_path}'")
               editor.frame!
+              scale_factors[screenshot.screen_size] = editor.actual_image_scale_factor
             end
           rescue => ex
             UI.error(ex.to_s)

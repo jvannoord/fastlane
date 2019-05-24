@@ -17,10 +17,12 @@ module Frameit
     attr_accessor :frame # the frame of the device
     attr_accessor :image # the current image used for editing
     attr_accessor :space_to_device
+    attr_accessor :actual_image_scale_factor
 
-    def initialize(screenshot, debug_mode = false)
+    def initialize(screenshot, debug_mode = false, image_scale_factor = 1.0)
       @screenshot = screenshot
       self.debug_mode = debug_mode
+      self.actual_image_scale_factor = image_scale_factor
     end
 
     def frame!
@@ -214,7 +216,8 @@ module Frameit
       @title_min_height ||= begin
         height = fetch_config['title_min_height'] || 0
         if height.kind_of?(String) && height.end_with?('%')
-          height = ([image.width, image.height].min * height.to_f * 0.01).ceil
+          #height = ([image.width, image.height].min * height.to_f * 0.01).ceil
+          height = (image.height * height.to_f * 0.01).ceil
         end
         height
       end
@@ -338,14 +341,19 @@ module Frameit
       title_below_image = fetch_config['title_below_image']
 
       # Resize the 2 labels if they exceed the available space either horizontally or vertically:
-      image_scale_factor = 1.0 # default
       ratio_horizontal = sum_width / (image.width.to_f - horizontal_frame_padding * 2) # The fraction of the text images compared to the left and right padding
       ratio_vertical = title.height.to_f / actual_font_size # The fraction of the actual height of the images compared to the available space
-      if ratio_horizontal > 1.0 || ratio_vertical > 1.0
-        # If either is too large, resize with the maximum ratio:
-        image_scale_factor = (1.0 / [ratio_horizontal, ratio_vertical].max)
 
-        UI.verbose("Text for image #{self.screenshot.path} is quite long, reducing font size by #{(100 * (1.0 - image_scale_factor)).round(1)}%")
+      image_scale_factor = 1.0 # default
+      if ratio_horizontal > 1.0 || ratio_vertical > 1.0
+        if self.actual_image_scale_factor == 1.0
+          # If either is too large, resize with the maximum ratio:
+
+          self.actual_image_scale_factor = (1.0 / [ratio_horizontal, ratio_vertical].max)
+
+          UI.verbose("Text for image #{self.screenshot.path} is quite long, reducing font size by #{(100 * self.actual_image_scale_factor).round(1)}%")
+        end
+        image_scale_factor = self.actual_image_scale_factor
 
         title.resize("#{(image_scale_factor * title.width).round}x")
         keyword.resize("#{(image_scale_factor * keyword.width).round}x") if keyword
